@@ -7,7 +7,7 @@ from aiogram.enums import ParseMode
 # --- КОНФИГУРАЦИЯ ---
 TOKEN = "8985863047:AAEmsp6pXTkosCHkV-bJe64cRtB59lslAUU"
 # Пользователи
-SUPPORT_USERNAME = "estalememn"
+SUPPORT_USERNAME = "israelmenm"
 SALES_USERNAME = "israelun"
 
 bot = Bot(token=TOKEN)
