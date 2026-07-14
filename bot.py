@@ -4,94 +4,79 @@ import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.enums import ParseMode
 
-# --- КОНФИГУРАЦИЯ ---
+# Настройки
 TOKEN = "8985863047:AAEmsp6pXTkosCHkV-bJe64cRtB59lslAUU"
-ADMIN_ID = 8814817662 
-SUPPORT_USERNAME = "israelmemn"  # Поддержка
-SALES_USERNAME = "israelun"      # Менеджер по продажам
+ADMIN_ID = 8814817662
+SUPPORT = "israelmemn"
+SALES = "israelun"
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# --- БАЗА ДАННЫХ (SQLite) ---
+# Функции базы данных
 async def init_db():
-    async with aiosqlite.connect("shop_data.db") as db:
+    async with aiosqlite.connect("shop.db") as db:
         await db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY)")
         await db.commit()
 
 async def add_user(user_id):
-    async with aiosqlite.connect("shop_data.db") as db:
+    async with aiosqlite.connect("shop.db") as db:
         await db.execute("INSERT OR IGNORE INTO users (id) VALUES (?)", (user_id,))
         await db.commit()
 
-async def get_all_users():
-    async with aiosqlite.connect("shop_data.db") as db:
-        async with db.execute("SELECT id FROM users") as cursor:
-            return [row[0] for row in await cursor.fetchall()]
+# Клавиатура
+main_kb = ReplyKeyboardMarkup(keyboard=[
+    [KeyboardButton(text="Каталог товаров"), KeyboardButton(text="Личный кабинет")],
+    [KeyboardButton(text="Поддержка"), KeyboardButton(text="Акции")]
+], resize_keyboard=True)
 
-# --- КЛАВИАТУРЫ ---
-def get_main_kb():
-    kb = [
-        [KeyboardButton(text="🛒 Каталог товаров"), KeyboardButton(text="👤 Личный кабинет")],
-        [KeyboardButton(text="💬 Поддержка"), KeyboardButton(text="🎁 Акции")]
-    ]
-    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-
-# --- ОБРАБОТЧИКИ ---
+# Обработчики
 @dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await add_user(message.from_user.id)
-    await message.answer(
-        "👋 **Добро пожаловать в Npay Shop!**\n\n"
-        "Лучший сервис для быстрых покупок. Выбери нужное действие в меню:",
-        reply_markup=get_main_kb(),
-        parse_mode=ParseMode.MARKDOWN
-    )
+async def cmd_start(msg: types.Message):
+    await add_user(msg.from_user.id)
+    await msg.answer("Добро пожаловать в Npay Shop.\nВыберите раздел в меню.", reply_markup=main_kb)
 
-@dp.message(F.text == "🛒 Каталог товаров")
-async def show_catalog(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Написать менеджеру", url=f"https://t.me/{SALES_USERNAME}")]])
-    await message.answer("📦 **Каталог Npay Shop**\nСвяжись с @israelun, чтобы оформить заказ.", reply_markup=kb)
+@dp.message(F.text == "Каталог товаров")
+async def catalog(msg: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Связаться с менеджером", url=f"https://t.me/{SALES}")]])
+    await msg.answer("Каталог товаров.\nДля оформления заказа свяжитесь с @israelun.", reply_markup=kb)
 
-@dp.message(F.text == "👤 Личный кабинет")
-async def show_profile(message: types.Message):
-    await message.answer(f"🆔 **Твой профиль**\n\nID: `{message.from_user.id}`\nСтатус: Покупатель Npay ✅")
+@dp.message(F.text == "Личный кабинет")
+async def profile(msg: types.Message):
+    await msg.answer(f"ID пользователя: {msg.from_user.id}\nСтатус: Активен")
 
-@dp.message(F.text == "💬 Поддержка")
-async def show_support(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Написать в поддержку", url=f"https://t.me/{SUPPORT_USERNAME}")]])
-    await message.answer("🛠 **Поддержка Npay Shop**\nНапиши специалисту @israelmemn, мы ответим как можно быстрее!", reply_markup=kb)
+@dp.message(F.text == "Поддержка")
+async def support(msg: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Написать в поддержку", url=f"https://t.me/{SUPPORT}")]])
+    await msg.answer("Техническая поддержка.\nСвяжитесь с @israelmemn для получения помощи.", reply_markup=kb)
 
-@dp.message(F.text == "🎁 Акции")
-async def show_promo(message: types.Message):
-    await message.answer("🔥 **Текущие акции:**\n\nСледи за новостями — скоро будут очень горячие предложения!")
+@dp.message(F.text == "Акции")
+async def promo(msg: types.Message):
+    await msg.answer("Актуальные акции будут опубликованы здесь.")
 
-# --- АДМИН-ПАНЕЛЬ ---
 @dp.message(Command("admin"))
-async def admin_menu(message: types.Message):
-    if message.from_user.id == ADMIN_ID:
-        users = await get_all_users()
-        await message.answer(f"👑 **Админ-панель**\nВсего юзеров в базе: {len(users)}\n\nКоманды:\n/broadcast [текст] — рассылка")
+async def admin(msg: types.Message):
+    if msg.from_user.id == ADMIN_ID:
+        await msg.answer("Панель администратора.\nИспользуйте /broadcast [текст] для рассылки.")
 
 @dp.message(Command("broadcast"))
-async def broadcast(message: types.Message):
-    if message.from_user.id == ADMIN_ID:
-        text = message.text.replace("/broadcast ", "")
-        users = await get_all_users()
-        count = 0
-        for user_id in users:
-            try:
-                await bot.send_message(user_id, text)
-                count += 1
-            except: pass
-        await message.answer(f"✅ Рассылка завершена. Успешно отправлено: {count}")
+async def broadcast(msg: types.Message):
+    if msg.from_user.id == ADMIN_ID:
+        command_args = msg.text.split(maxsplit=1)
+        if len(command_args) > 1:
+            text = command_args[1]
+            async with aiosqlite.connect("shop.db") as db:
+                async with db.execute("SELECT id FROM users") as cursor:
+                    users = await cursor.fetchall()
+                    for user in users:
+                        try: await bot.send_message(user[0], text)
+                        except: continue
+            await msg.answer("Рассылка завершена.")
 
 async def main():
     await init_db()
-    print("Бот Npay Shop успешно запущен!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
